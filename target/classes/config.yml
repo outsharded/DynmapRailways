@@ -1,0 +1,69 @@
+# DynmapRailways Configuration
+
+# Whether to enable the rail visualization system
+enabled: true
+
+# Map rendering settings
+map:
+  # Use a white background instead of flat map
+  use-white-background: false
+  
+  # Rendering layer priority (higher = rendered on top)
+  rail-layer-priority: 10
+  station-layer-priority: 11
+  
+  # Station marker size (radius in pixels)
+  station-radius: 10
+
+# CoreProtect integration
+coreprotect:
+  # Enable scanning for player-placed rail blocks
+  enabled: true
+  
+  # Maximum number of records to retrieve per scan
+  max-records: 10000
+  
+  # Include auto-generated rails
+  include-auto-generated: false
+
+# Rail line colors
+# Uses TfL Tube Map colors by default
+# Specify custom colors in hex format (e.g., "#E21836")
+colors:
+  line-1: "#E21836"    # Bakerloo
+  line-2: "#000000"    # Central
+  line-3: "#FFD300"    # Circle
+  line-4: "#00B0F0"    # District
+  line-5: "#EE7C0E"    # Hammersmith & City
+  line-6: "#A0A5A9"    # Jubilee
+  line-7: "#F391A0"    # Metropolitan
+  line-8: "#9B0056"    # Northern
+  line-9: "#E7A81E"    # Piccadilly
+  line-10: "#00A4EF"   # Victoria
+  line-11: "#0019A8"   # Waterloo & City
+
+# Data storage
+storage:
+  # Type: "file" (JSON files) or "database" (Dynmap database)
+  type: file
+  
+  # Auto-save interval in seconds (0 = disabled)
+  auto-save-interval: 300
+  
+  # Database settings (if type is "database")
+  database:
+    table-prefix: railway_
+
+# Scanning
+scanning:
+  # Enable automatic scanning when Dynmap scans
+  auto-scan: true
+  
+  # Scan interval in minutes
+  scan-interval: 60
+  
+  # Automatically create rail lines from scanned blocks
+  auto-create-lines: false
+
+# Development/Debug
+debug: false
