@@ -1,11 +1,11 @@
 com/fabianoley/dynmaprailways/DynmapRailways.class
 com/fabianoley/dynmaprailways/station/Station.class
 com/fabianoley/dynmaprailways/storage/RailwayDataStorage.class
+com/fabianoley/dynmaprailways/scan/RailScanner$Direction.class
 com/fabianoley/dynmaprailways/map/RailwayMapRenderer.class
 com/fabianoley/dynmaprailways/DynmapRailways$1.class
-com/fabianoley/dynmaprailways/integration/CoreProtectIntegration.class
+com/fabianoley/dynmaprailways/scan/RailScanner$1.class
 com/fabianoley/dynmaprailways/scan/RailScanner.class
 com/fabianoley/dynmaprailways/commands/RailwayCommand.class
-com/fabianoley/dynmaprailways/integration/CoreProtectIntegration$CoreProtectRecord.class
 com/fabianoley/dynmaprailways/rail/RailLine.class
 com/fabianoley/dynmaprailways/rail/RailLine$RailBlock.class

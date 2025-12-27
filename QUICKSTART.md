@@ -41,7 +41,6 @@
 | `/railway list` | View all rail lines | railway.use |
 | `/railway station create <name>` | Create a station | railway.use |
 | `/railway station list` | View all stations | railway.use |
-| `/railway scan` | Auto-scan CoreProtect (requires CoreProtect) | railway.admin |
 | `/railway reload` | Reload map visualization | railway.admin |
 
 ## Configuration
@@ -50,13 +49,12 @@ Edit `plugins/DynmapRailways/config.yml`:
 
 - **enabled**: Turn plugin on/off
 - **map.use-white-background**: Show rails on white background instead of flat map
-- **coreprotect.enabled**: Enable CoreProtect scanning
 - **colors**: Customize rail line colors (TfL colors by default)
 - **storage.type**: Choose "file" or "database" storage
 
 ## How It Works
 
-1. **Create rail lines** using commands or auto-detect from CoreProtect
+1. **Create rail lines** using commands or auto-detect from the world
 2. **Assign TfL colors** automatically (cycling through 11 classic tube map colors)
 3. **Add stations** as waypoints on your map
 4. **View on Dynmap** - all updates sync in real-time

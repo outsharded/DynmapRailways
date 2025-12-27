@@ -1,6 +1,5 @@
 /Users/fabianoley/code/DynmapRailways/src/main/java/com/fabianoley/dynmaprailways/storage/RailwayDataStorage.java
 /Users/fabianoley/code/DynmapRailways/src/main/java/com/fabianoley/dynmaprailways/scan/RailScanner.java
-/Users/fabianoley/code/DynmapRailways/src/main/java/com/fabianoley/dynmaprailways/integration/CoreProtectIntegration.java
 /Users/fabianoley/code/DynmapRailways/src/main/java/com/fabianoley/dynmaprailways/map/RailwayMapRenderer.java
 /Users/fabianoley/code/DynmapRailways/src/main/java/com/fabianoley/dynmaprailways/DynmapRailways.java
 /Users/fabianoley/code/DynmapRailways/src/main/java/com/fabianoley/dynmaprailways/commands/RailwayCommand.java

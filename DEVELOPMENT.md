@@ -85,12 +85,6 @@ Dynmap markers are fully recreated on update:
 3. Update `RailwayDataStorage` save/load if adding complex types
 4. Update renderer in `RailwayMapRenderer.renderRailLine()`
 
-### Add CoreProtect Scanning
-
-1. Implement `getRailPlacements()` with actual Query objects
-2. Use returned records to cluster into rail lines
-3. Consider async execution for large networks
-4. See existing stub in `CoreProtectIntegration.java`
 
 ### Switch to Database Storage
 
@@ -151,13 +145,11 @@ Use:
 ## Performance Considerations
 
 - **Large networks**: Consider async marker creation
-- **CoreProtect scanning**: Limit `max-records` in config
 - **JSON files**: Switch to database if > 1000 entities
 - **Marker updates**: Only call `updateAllMarkers()` when data changes
 
 ## Next Development Priorities
 
-1. **Full CoreProtect scanning** with graph clustering
 2. **Async rendering** for large networks
 3. **Database backend** support (MySQL/PostgreSQL)
 4. **Web UI controls** in Dynmap frontend

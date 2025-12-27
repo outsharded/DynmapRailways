@@ -12,13 +12,6 @@ A Minecraft plugin addon for Dynmap that **automatically detects and visualizes 
 - **Real-time Rendering**: Updates Dynmap visualization on-demand via simple commands
 - **Optional CoreProtect**: Can filter rails by player who placed them (integration ready)
 
-## Requirements
-
-- Minecraft 1.21.8+
-- Spigot/Paper server
-- Dynmap plugin
-- Java 21+
-- (Optional) CoreProtect plugin for player-placed rail filtering
 
 ## Installation
 
@@ -83,25 +76,9 @@ When you run `/railway scan`:
 4. **Persistence**: The rail networks are saved to `plugins/DynmapRailways/rails.json`
 5. **Rendering Phase**: The map renderer updates Dynmap with polylines for each network
 
-## Configuration
-
-Edit `config.yml` in `plugins/DynmapRailways/` to customize (future versions):
-
-- **Map rendering options**: Layer priorities, marker styles
-- **CoreProtect integration**: Enable/disable player filtering
-- **Auto-scanning**: Automatic scanning intervals
-- **Colors**: Custom color palettes
 
 ## Architecture
 
-### Core Components
-
-- **RailScanner**: Detects rail blocks and clusters them using BFS
-- **RailLine**: Represents a detected continuous rail network with blocks
-- **Station**: Manually-marked locations appearing as white circles
-- **RailwayMapRenderer**: Converts rail data to Dynmap polylines and markers
-- **RailwayDataStorage**: Persists data to JSON files
-- **CoreProtectIntegration**: Optional player-placed rail filtering (ready for implementation)
 
 ### Data Flow
 
@@ -142,20 +119,7 @@ src/main/java/com/fabianoley/dynmaprailways/
 mvn clean install
 ```
 
-### Dependencies
 
-- Spigot API (provided by server)
-- Dynmap Core API 3.8+
-- CoreProtect API 21.4+ (optional)
-- GSON 2.10.1 (shaded)
-
-## Troubleshooting
-
-**Plugin won't load**: Check that Dynmap is installed and enabled first.
-
-**Rails not showing**: Ensure CoreProtect integration is enabled if auto-scanning, or manually create lines with `/railway create`.
-
-**Performance issues**: Reduce `coreprotect.max-records` if scanning is slow.
 
 ## License
 

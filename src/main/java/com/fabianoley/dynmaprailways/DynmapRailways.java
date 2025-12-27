@@ -6,7 +6,6 @@ import org.bukkit.Bukkit;
 import com.fabianoley.dynmaprailways.map.RailwayMapRenderer;
 import org.dynmap.DynmapCommonAPI;
 import org.dynmap.DynmapCommonAPIListener;
-import com.fabianoley.dynmaprailways.integration.CoreProtectIntegration;
 import com.fabianoley.dynmaprailways.storage.RailwayDataStorage;
 import com.fabianoley.dynmaprailways.commands.RailwayCommand;
 import java.io.File;
@@ -22,7 +21,6 @@ public class DynmapRailways extends JavaPlugin {
     private static final Logger logger = Logger.getLogger("DynmapRailways");
     
     private DynmapCommonAPI dynmapAPI; // Will be set at runtime
-    private CoreProtectIntegration coreProtectIntegration;
     private RailwayDataStorage dataStorage;
     private RailwayMapRenderer mapRenderer;
     
@@ -56,13 +54,7 @@ public class DynmapRailways extends JavaPlugin {
                     return;
                 }
 
-                // Initialize CoreProtect integration
-                coreProtectIntegration = new CoreProtectIntegration(DynmapRailways.this);
-                if (!coreProtectIntegration.initialize()) {
-                    getLogger().warning("CoreProtect not available. Rail line detection may be limited.");
-                } else {
-                    getLogger().info("CoreProtect integration initialized.");
-                }
+
 
                 // Initialize map renderer
                 getLogger().info("[DEBUG] About to initialize map renderer...");
@@ -123,10 +115,6 @@ public class DynmapRailways extends JavaPlugin {
     
     public DynmapCommonAPI getDynmapAPI() {
         return dynmapAPI;
-    }
-    
-    public CoreProtectIntegration getCoreProtectIntegration() {
-        return coreProtectIntegration;
     }
     
     public RailwayDataStorage getDataStorage() {

@@ -11,7 +11,6 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.Bukkit;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Command handler for railway commands.
@@ -35,7 +34,7 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
         
         switch (subcommand) {
             case "scan":
-                return handleScan(sender);
+                return handleScan(sender, args);
             case "list":
                 return handleList(sender);
             case "station":
@@ -50,12 +49,75 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
         }
     }
     
-    private boolean handleScan(CommandSender sender) {
+    private boolean handleScan(CommandSender sender, String[] args) {
         if (!sender.hasPermission("railway.admin")) {
             sender.sendMessage("§cYou don't have permission to use this command.");
             return true;
         }
         
+        // Optional: radius overload for targeted chunk scanning around the player
+        if (args.length >= 2) {
+            if (!(sender instanceof Player)) {
+                sender.sendMessage("§cRadius scan can only be used by a player.");
+                return true;
+            }
+            int radius;
+            try {
+                radius = Integer.parseInt(args[1]);
+            } catch (NumberFormatException ex) {
+                sender.sendMessage("§cInvalid radius. Usage: /railway scan <chunk-radius>");
+                return true;
+            }
+            if (radius < 0) {
+                sender.sendMessage("§cRadius must be zero or positive.");
+                return true;
+            }
+
+            Player player = (Player) sender;
+            org.bukkit.World world = player.getWorld();
+            org.bukkit.Chunk playerChunk = player.getLocation().getChunk();
+            int baseX = playerChunk.getX();
+            int baseZ = playerChunk.getZ();
+
+            // Pre-load existing generated chunks within radius on the main thread (non-generating)
+            sender.sendMessage("§eScanning chunks within radius " + radius + " around you...");
+            final java.util.Set<org.bukkit.Chunk> chunksToScan = new java.util.LinkedHashSet<>();
+            for (int cx = baseX - radius; cx <= baseX + radius; cx++) {
+                for (int cz = baseZ - radius; cz <= baseZ + radius; cz++) {
+                    // If already loaded, include; else try to load without generating new chunks
+                    if (world.isChunkLoaded(cx, cz)) {
+                        chunksToScan.add(world.getChunkAt(cx, cz));
+                    } else {
+                        boolean loaded = world.loadChunk(cx, cz, false); // do not generate
+                        if (loaded) {
+                            chunksToScan.add(world.getChunkAt(cx, cz));
+                        }
+                    }
+                }
+            }
+
+            // Run scan asynchronously for these chunks only
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+                try {
+                    List<RailLine> lines = RailScanner.scanChunks(world, chunksToScan);
+                    for (RailLine line : lines) {
+                        plugin.getDataStorage().saveRailLine(line);
+                    }
+                    final int lineCount = lines.size();
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        plugin.getMapRenderer().updateAllMarkers();
+                        sender.sendMessage("§aRadius scan complete! Found " + lineCount + " rail lines.");
+                    });
+                } catch (Exception e) {
+                    sender.sendMessage("§cError during radius scan: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            });
+
+            return true;
+        }
+
+        // Default: scan all currently loaded chunks in all worlds
         sender.sendMessage("§eScanning all worlds for rail blocks...");
         
         // Scan all worlds asynchronously
@@ -136,11 +198,12 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
                 int z = (int) player.getLocation().getZ();
                 
                 try {
-                    Station station = new Station(stationId, stationName, x, z);
+                    String world = player.getWorld().getName();
+                    Station station = new Station(stationId, stationName, x, player.getLocation().getBlockY(), z, world);
                     station.setCreatedBy(player.getName());
                     plugin.getDataStorage().saveStation(station);
                     plugin.getMapRenderer().updateAllMarkers();
-                    sender.sendMessage("§aStation created: " + stationName + " at (" + x + ", " + z + ")");
+                    sender.sendMessage("§aStation created: " + stationName + " at (" + x + ", " + z + ") in world " + world);
                 } catch (Exception e) {
                     sender.sendMessage("§cError creating station: " + e.getMessage());
                 }
@@ -204,7 +267,7 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
         }
         
         if (args.length < 2) {
-            sender.sendMessage("§cUsage: /railway debug <reinit|info>");
+            sender.sendMessage("§cUsage: /railway debug <reinit|info|block>");
             return true;
         }
         
@@ -223,6 +286,44 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage("§eStations: " + plugin.getDataStorage().getStations().size());
                 sender.sendMessage("§eCheck console for marker set details.");
                 return true;
+            
+            // ========== TEMPORARY DEBUG COMMAND - REMOVE AFTER TESTING ==========
+            case "block":
+                if (args.length < 5) {
+                    sender.sendMessage("§cUsage: /railway debug block <x> <y> <z>");
+                    return true;
+                }
+                try {
+                    int x = Integer.parseInt(args[2]);
+                    int y = Integer.parseInt(args[3]);
+                    int z = Integer.parseInt(args[4]);
+                    
+                    org.bukkit.World world;
+                    if (sender instanceof Player) {
+                        world = ((Player) sender).getWorld();
+                    } else {
+                        world = Bukkit.getWorlds().get(0); // Default to first world
+                    }
+                    
+                    org.bukkit.block.Block block = world.getBlockAt(x, y, z);
+                    sender.sendMessage("§6=== Block Debug at (" + x + ", " + y + ", " + z + ") ===");
+                    sender.sendMessage("§eMaterial: §f" + block.getType().name());
+                    sender.sendMessage("§eIs Rail Block: §f" + (block.getBlockData() instanceof org.bukkit.block.data.Rail));
+                    
+                    if (block.getBlockData() instanceof org.bukkit.block.data.Rail) {
+                        org.bukkit.block.data.Rail rail = (org.bukkit.block.data.Rail) block.getBlockData();
+                        sender.sendMessage("§eRail Shape: §f" + rail.getShape().name());
+                        sender.sendMessage("§eRail Type: §f" + block.getType().name());
+                    }
+                    
+                    sender.sendMessage("§eChunk: §f(" + (x >> 4) + ", " + (z >> 4) + ")");
+                    sender.sendMessage("§eChunk Loaded: §f" + world.isChunkLoaded(x >> 4, z >> 4));
+                    
+                } catch (NumberFormatException e) {
+                    sender.sendMessage("§cInvalid coordinates. Use integer values.");
+                }
+                return true;
+            // =====================================================================
                 
             default:
                 sender.sendMessage("§cUnknown debug action: " + action);

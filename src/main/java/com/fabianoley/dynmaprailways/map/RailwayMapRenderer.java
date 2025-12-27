@@ -34,6 +34,7 @@ public class RailwayMapRenderer {
         this.plugin = plugin;
         this.dynmapAPI = dynmapAPI;
         this.dataStorage = dataStorage;
+        // No CoreProtect filtering
     }
     
     /**
@@ -41,6 +42,12 @@ public class RailwayMapRenderer {
      */
     public void initialize() {
         logger.info("[DEBUG] Starting RailwayMapRenderer initialization...");
+        // Touch plugin to avoid unused field warning and for debugging context
+        if (plugin != null) {
+            logger.fine("[DEBUG] Renderer initialized for plugin: " + plugin.getClass().getName());
+        }
+
+        // No CoreProtect filtering
 
         if (dynmapAPI == null) {
             logger.severe("[DEBUG] Dynmap API is null!");
@@ -168,14 +175,6 @@ public class RailwayMapRenderer {
      * Render a rail line as polylines connecting blocks.
      */
     private void renderRailLine(RailLine line) {
-        if (line == null) {
-            logger.warning("[renderRailLine] line is null");
-            return;
-        }
-        if (railwayMarkerSet == null) {
-            logger.warning("[renderRailLine] railwayMarkerSet is null");
-            return;
-        }
         Set<RailBlock> blocks = line.getBlocks();
         if (blocks == null) {
             logger.warning("[renderRailLine] blocks is null for line: " + line.getId());
@@ -186,31 +185,54 @@ public class RailwayMapRenderer {
             return;
         }
 
-        // Convert to arrays for polyline
-        List<RailBlock> blockList = new ArrayList<>(blocks);
-        blockList.sort((a, b) -> {
-            if (a.x != b.x) return Integer.compare(a.x, b.x);
-            if (a.z != b.z) return Integer.compare(a.z, b.z);
-            return Integer.compare(a.y, b.y);
-        });
+        // --- Path-walking logic: order blocks as a path ---
+        List<RailBlock> ordered = walkRailPath(blocks);
+        if (ordered.size() < 2) {
+            logger.fine("[renderRailLine] Ordered path too short: " + line.getId());
+            return;
+        }
 
-        double[] xpts = new double[blockList.size()];
-        double[] ypts = new double[blockList.size()];
-        double[] zpts = new double[blockList.size()];
+        // --- Use all ordered points to ensure continuous connection across curves and slopes ---
+        List<RailBlock> polylinePoints = new ArrayList<>();
+        RailBlock prev = null;
+        int lastDx = 0, lastDz = 0;
+        for (RailBlock block : ordered) {
+            if (prev == null) {
+                polylinePoints.add(block);
+            } else {
+                int dx = Integer.compare(block.x, prev.x); // -1, 0, or 1
+                int dz = Integer.compare(block.z, prev.z); // -1, 0, or 1
+                // Add point only if direction changes (avoids drawing diagonals between non-adjacent blocks)
+                if (dx != lastDx || dz != lastDz) {
+                    polylinePoints.add(prev);
+                    lastDx = dx;
+                    lastDz = dz;
+                }
+            }
+            prev = block;
+        }
+        // Always add the final point
+        if (prev != null && (polylinePoints.isEmpty() || !polylinePoints.get(polylinePoints.size() - 1).equals(prev))) {
+            polylinePoints.add(prev);
+        }
 
-        for (int i = 0; i < blockList.size(); i++) {
-            RailBlock block = blockList.get(i);
+        double[] xpts = new double[polylinePoints.size()];
+        double[] ypts = new double[polylinePoints.size()];
+        double[] zpts = new double[polylinePoints.size()];
+
+        for (int i = 0; i < polylinePoints.size(); i++) {
+            RailBlock block = polylinePoints.get(i);
             if (block == null) {
-                logger.warning("[renderRailLine] Null RailBlock in blockList for line: " + line.getId());
+                logger.warning("[renderRailLine] Null RailBlock in polylinePoints for line: " + line.getId());
                 return;
             }
             xpts[i] = block.x + 0.5;
-            ypts[i] = block.y + 0.5;
+            ypts[i] = 64.0; // Flat 2D map, fixed Y (ground level)
             zpts[i] = block.z + 0.5;
         }
 
         // Use the world from the first block
-        String world = blockList.get(0).world;
+        String world = polylinePoints.get(0).world;
         if (world == null) {
             logger.warning("[renderRailLine] World is null for line: " + line.getId());
             return;
@@ -231,6 +253,7 @@ public class RailwayMapRenderer {
             }
         }
 
+
         PolyLineMarker marker = null;
         try {
             marker = railwayMarkerSet.createPolyLineMarker(
@@ -246,9 +269,70 @@ public class RailwayMapRenderer {
             } catch (Exception e) {
                 logger.warning("[renderRailLine] Exception in setLineStyle: " + e.getMessage());
             }
-            logger.fine("Rendered rail line: " + line.getName() + " (" + blocks.size() + " blocks)");
+            logger.fine("Rendered rail line: " + line.getName() + " (" + line.getBlockCount() + " blocks)");
         } else {
             logger.warning("[renderRailLine] Failed to create PolyLineMarker for line: " + line.getId());
+        }
+        // ...existing code...
+
+    }
+
+    
+
+    /**
+     * Walk the rail cluster as a path, returning an ordered list of blocks.
+     * This finds an endpoint and does a DFS walk.
+     */
+    private List<RailBlock> walkRailPath(Set<RailBlock> blocks) {
+        if (blocks.isEmpty()) return Collections.emptyList();
+        // Build adjacency map with vertical fallback (y±1); no diagonals to keep paths axis-aligned
+        Map<RailBlock, List<RailBlock>> adj = new HashMap<>();
+        for (RailBlock b : blocks) {
+            List<RailBlock> neighbors = new ArrayList<>();
+            int[][] dirs = new int[][]{{1,0},{-1,0},{0,1},{0,-1}};
+            for (int[] d : dirs) {
+                int nx = b.x + d[0];
+                int nz = b.z + d[1];
+                // Try same Y first
+                RailBlock nSame = new RailBlock(nx, b.y, nz, b.world);
+                if (blocks.contains(nSame)) {
+                    neighbors.add(nSame);
+                    continue;
+                }
+                // If not found, try one block above (ascending)
+                RailBlock nUp = new RailBlock(nx, b.y + 1, nz, b.world);
+                if (blocks.contains(nUp)) {
+                    neighbors.add(nUp);
+                    continue;
+                }
+                // If still not found, try one block below (descending)
+                RailBlock nDown = new RailBlock(nx, b.y - 1, nz, b.world);
+                if (blocks.contains(nDown)) {
+                    neighbors.add(nDown);
+                }
+            }
+            adj.put(b, neighbors);
+        }
+        // Find endpoint (degree 1), or any block
+        RailBlock start = null;
+        for (RailBlock b : blocks) {
+            if (adj.get(b).size() == 1) { start = b; break; }
+        }
+        if (start == null) start = blocks.iterator().next();
+        // DFS walk
+        List<RailBlock> path = new ArrayList<>();
+        Set<RailBlock> visited = new HashSet<>();
+        dfsWalk(start, null, adj, visited, path);
+        return path;
+    }
+
+    private void dfsWalk(RailBlock curr, RailBlock parent, Map<RailBlock, List<RailBlock>> adj, Set<RailBlock> visited, List<RailBlock> path) {
+        visited.add(curr);
+        path.add(curr);
+        for (RailBlock n : adj.get(curr)) {
+            if (!n.equals(parent) && !visited.contains(n)) {
+                dfsWalk(n, curr, adj, visited, path);
+            }
         }
     }
     
@@ -264,10 +348,14 @@ public class RailwayMapRenderer {
 
         // Use correct Dynmap API signature for createCircleMarker
         // (String id, String label, boolean markup, String world, double x, double y, double z, double radius, double ytop, boolean persistent)
-        String world = null;
+        String world = station.getWorld();
+        if (world == null) {
+            logger.warning("[renderStation] Station world is null for station: " + station.getId());
+            return;
+        }
         double x = station.getX() + 0.5;
         double z = station.getZ() + 0.5;
-        double y = 64.0; // Default Y, or fetch from station if available
+        double y = station.getY() > 0 ? station.getY() + 0.5 : 64.0;
         double radius = 10.0;
         double ytop = y + 2.0;
         boolean persistent = false;

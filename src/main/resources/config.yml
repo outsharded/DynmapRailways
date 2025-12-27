@@ -15,16 +15,7 @@ map:
   # Station marker size (radius in pixels)
   station-radius: 10
 
-# CoreProtect integration
-coreprotect:
-  # Enable scanning for player-placed rail blocks
-  enabled: true
-  
-  # Maximum number of records to retrieve per scan
-  max-records: 10000
-  
-  # Include auto-generated rails
-  include-auto-generated: false
+## CoreProtect integration removed
 
 # Rail line colors
 # Uses TfL Tube Map colors by default
@@ -63,7 +54,7 @@ scanning:
   scan-interval: 60
   
   # Automatically create rail lines from scanned blocks
-  auto-create-lines: false
+  auto-create-lines: true
 
 # Development/Debug
 debug: false

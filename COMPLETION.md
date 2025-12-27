@@ -34,7 +34,6 @@ src/main/java/com/fabianoley/dynmaprailways/
 ├── rail/RailLine.java                  # Rail data model
 ├── station/Station.java                # Station data model  
 ├── map/RailwayMapRenderer.java         # Dynmap visualization
-├── integration/CoreProtectIntegration.java  # CoreProtect wrapper
 └── storage/RailwayDataStorage.java     # JSON persistence
 
 src/main/resources/
@@ -58,7 +57,6 @@ src/main/resources/
 - ✅ JSON file-based persistence
 - ✅ Per-player builder pattern for line creation
 - ✅ Full marker lifecycle management
-- ✅ Optional CoreProtect integration
 - ✅ Comprehensive logging
 - ✅ Graceful plugin disable on missing Dynmap
 
