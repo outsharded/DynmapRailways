@@ -104,9 +104,20 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
                         plugin.getDataStorage().saveRailLine(line);
                     }
                     final int lineCount = lines.size();
+                    int humanCount = 0;
+                    for (RailLine line : lines) {
+                        if (line.getCreatedBy() != null && !line.getCreatedBy().isEmpty()) {
+                            humanCount++;
+                        }
+                    }
+                    final int finalHumanCount = humanCount;
                     Bukkit.getScheduler().runTask(plugin, () -> {
                         plugin.getMapRenderer().updateAllMarkers();
-                        sender.sendMessage("§aRadius scan complete! Found " + lineCount + " rail lines.");
+                        sender.sendMessage("§aRadius scan complete! Found " + lineCount + " rail lines (§b" + finalHumanCount + " player-placed§a).");
+                        boolean playerOnly = plugin.getConfig().getBoolean("coreprotect.player-placed-only", false);
+                        if (playerOnly) {
+                            sender.sendMessage("§7Note: Rendering is set to player-placed lines only.");
+                        }
                     });
                 } catch (Exception e) {
                     sender.sendMessage("§cError during radius scan: " + e.getMessage());
@@ -124,6 +135,7 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
                 int totalLines = 0;
+                int humanLines = 0;
                 
                 for (org.bukkit.World world : Bukkit.getWorlds()) {
                     List<RailLine> lines = RailScanner.scanWorld(world);
@@ -132,14 +144,22 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
                     // Save lines
                     for (RailLine line : lines) {
                         plugin.getDataStorage().saveRailLine(line);
+                        if (line.getCreatedBy() != null && !line.getCreatedBy().isEmpty()) {
+                            humanLines++;
+                        }
                     }
                 }
                 
                 // Update map on main thread
                 final int finalTotalLines = totalLines;
+                final int finalHumanLines = humanLines;
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     plugin.getMapRenderer().updateAllMarkers();
-                    sender.sendMessage("§aScanning complete! Found " + finalTotalLines + " rail lines.");
+                    sender.sendMessage("§aScanning complete! Found " + finalTotalLines + " rail lines (§b" + finalHumanLines + " player-placed§a).");
+                    boolean playerOnly = plugin.getConfig().getBoolean("coreprotect.player-placed-only", false);
+                    if (playerOnly) {
+                        sender.sendMessage("§7Note: Rendering is set to player-placed lines only.");
+                    }
                 });
             } catch (Exception e) {
                 sender.sendMessage("§cError during scan: " + e.getMessage());

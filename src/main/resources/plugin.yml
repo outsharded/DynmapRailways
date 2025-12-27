@@ -4,9 +4,10 @@ main: com.fabianoley.dynmaprailways.DynmapRailways
 description: A Dynmap addon for displaying rail lines as a tube map
 authors: [FabianoLey]
 api-version: "1.21"
+depend:
+  - dynmap
 softdepend:
-  - Dynmap
-  - CoreProtect
+  - coreprotect
 commands:
   railway:
     description: Railway management commands

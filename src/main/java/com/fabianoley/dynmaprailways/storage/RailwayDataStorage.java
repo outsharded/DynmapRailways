@@ -18,14 +18,14 @@ public class RailwayDataStorage {
     private static final String RAILS_FILE = "rails.json";
     private static final String STATIONS_FILE = "stations.json";
     
-    private DynmapRailways plugin;
+   // private DynmapRailways plugin;
     private File dataFolder;
     private Map<String, RailLine> railLines = new HashMap<>();
     private Map<String, Station> stations = new HashMap<>();
     private Gson gson;
     
     public RailwayDataStorage(DynmapRailways plugin) {
-        this.plugin = plugin;
+        //this.plugin = plugin;
         this.dataFolder = plugin.getDataFolder();
         this.gson = new GsonBuilder().setPrettyPrinting().create();
     }

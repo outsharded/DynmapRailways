@@ -2,14 +2,9 @@ package com.fabianoley.dynmaprailways.scan;
 
 import org.bukkit.World;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockState;
-import org.bukkit.block.data.BlockData;
-import org.bukkit.block.data.Rail;
-import org.bukkit.material.DetectorRail;
-import org.bukkit.material.PoweredRail;
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 
+import com.fabianoley.dynmaprailways.integration.CoreProtectIntegration;
 import com.fabianoley.dynmaprailways.rail.RailLine;
 import com.fabianoley.dynmaprailways.rail.RailLine.RailBlock;
 import java.util.*;
@@ -21,9 +16,11 @@ import java.util.logging.Logger;
 public class RailScanner {
     
     private static final Logger logger = Logger.getLogger("DynmapRailways");
-    private static final int[] DX = {-1, 1, 0, 0, 0, 0};
-    private static final int[] DY = {0, 0, -1, 1, 0, 0};
-    private static final int[] DZ = {0, 0, 0, 0, -1, 1};
+    private static CoreProtectIntegration coreProtect;
+
+    public static void setCoreProtectIntegration(CoreProtectIntegration integration) {
+        coreProtect = integration;
+    }
     
     /**
      * Scan a world for rail blocks and cluster them into rail lines.
@@ -34,7 +31,7 @@ public class RailScanner {
         Set<RailBlock> allRails = findAllRails(world);
         logger.info("Found " + allRails.size() + " rail blocks");
         
-        List<RailLine> lines = clusterRails(allRails);
+        List<RailLine> lines = clusterRails(world, allRails);
         logger.info("Clustered into " + lines.size() + " rail lines");
         
         return lines;
@@ -50,7 +47,7 @@ public class RailScanner {
         Set<RailBlock> rails = findRailsInChunks(world, chunks);
         logger.info("Found " + rails.size() + " rail blocks in targeted chunks");
 
-        List<RailLine> lines = clusterRails(rails);
+        List<RailLine> lines = clusterRails(world, rails);
         logger.info("Clustered into " + lines.size() + " rail lines from targeted chunks");
 
         return lines;
@@ -126,11 +123,12 @@ public class RailScanner {
      * Each rail is tagged with how many neighbors it has (ignoring Y and shape connectivity).
      * Lines are traced from endpoints (1 neighbor) following the path until reaching another endpoint.
      */
-    private static List<RailLine> clusterRails(Set<RailBlock> allRails) {
+    private static List<RailLine> clusterRails(World world, Set<RailBlock> allRails) {
         List<RailLine> lines = new ArrayList<>();
         Set<RailBlock> visited = new HashSet<>();
         String[] colors = getTflColors();
         int colorIndex = 0;
+        Map<String, Integer> placerCounts = new HashMap<>();
         
         // Build neighbor map: each rail -> count of adjacent rails in XZ plane
         Map<RailBlock, Integer> neighborCount = new HashMap<>();
@@ -255,6 +253,16 @@ public class RailScanner {
                         colors[colorIndex % colors.length]
                 );
                 railLine.addBlocks(line);
+
+                // Determine placer for the line via CoreProtect (majority vote among blocks)
+                String placer = resolveLinePlacer(world, line);
+                if (placer != null) {
+                    railLine.setCreatedBy(placer);
+                    int num = placerCounts.getOrDefault(placer, 0) + 1;
+                    placerCounts.put(placer, num);
+                    railLine.setName(placer + "'s Line: No. " + num);
+                }
+
                 lines.add(railLine);
                 colorIndex++;
             }
@@ -270,6 +278,15 @@ public class RailScanner {
                             colors[colorIndex % colors.length]
                     );
                     railLine.addBlocks(cluster);
+
+                    String placer = resolveLinePlacer(world, cluster);
+                    if (placer != null) {
+                        railLine.setCreatedBy(placer);
+                        int num = placerCounts.getOrDefault(placer, 0) + 1;
+                        placerCounts.put(placer, num);
+                        railLine.setName(placer + "'s Line: No. " + num);
+                    }
+
                     lines.add(railLine);
                     colorIndex++;
                     visited.addAll(cluster);
@@ -278,6 +295,27 @@ public class RailScanner {
         }
         
         return lines;
+    }
+
+    private static String resolveLinePlacer(World world, Set<RailBlock> lineBlocks) {
+        if (coreProtect == null || !coreProtect.isEnabled()) return null;
+        Map<String, Integer> freq = new HashMap<>();
+        for (RailBlock rb : lineBlocks) {
+            org.bukkit.block.Block b = world.getBlockAt(rb.x, rb.y, rb.z);
+            String p = coreProtect.getBlockPlacer(b);
+            if (p != null && coreProtect.matchesFilters(b, p)) {
+                freq.put(p, freq.getOrDefault(p, 0) + 1);
+            }
+        }
+        String best = null;
+        int bestCount = 0;
+        for (Map.Entry<String, Integer> e : freq.entrySet()) {
+            if (e.getValue() > bestCount) {
+                best = e.getKey();
+                bestCount = e.getValue();
+            }
+        }
+        return best;
     }
     
     /**
@@ -307,78 +345,7 @@ public class RailScanner {
         return cluster;
     }
 
-    // Direction enum for rail path following
-    private enum Direction {
-        NORTH(0, 0, -1), SOUTH(0, 0, 1), EAST(1, 0, 0), WEST(-1, 0, 0),
-        UP(0, 1, 0), DOWN(0, -1, 0),
-        // Diagonal directions for ascending rails
-        ASCENDING_NORTH_UP(0, 1, -1), ASCENDING_SOUTH_UP(0, 1, 1),
-        ASCENDING_EAST_UP(1, 1, 0), ASCENDING_WEST_UP(-1, 1, 0),
-        ASCENDING_NORTH_DOWN(0, -1, -1), ASCENDING_SOUTH_DOWN(0, -1, 1),
-        ASCENDING_EAST_DOWN(-1, -1, 0), ASCENDING_WEST_DOWN(1, -1, 0);
-        
-        public final int dx, dy, dz;
-        Direction(int dx, int dy, int dz) { this.dx = dx; this.dy = dy; this.dz = dz; }
-        public Direction opposite() {
-            switch (this) {
-                case NORTH: return SOUTH;
-                case SOUTH: return NORTH;
-                case EAST: return WEST;
-                case WEST: return EAST;
-                case UP: return DOWN;
-                case DOWN: return UP;
-                case ASCENDING_NORTH_UP: return ASCENDING_NORTH_DOWN;
-                case ASCENDING_SOUTH_UP: return ASCENDING_SOUTH_DOWN;
-                case ASCENDING_EAST_UP: return ASCENDING_EAST_DOWN;
-                case ASCENDING_WEST_UP: return ASCENDING_WEST_DOWN;
-                case ASCENDING_NORTH_DOWN: return ASCENDING_NORTH_UP;
-                case ASCENDING_SOUTH_DOWN: return ASCENDING_SOUTH_UP;
-                case ASCENDING_EAST_DOWN: return ASCENDING_EAST_UP;
-                case ASCENDING_WEST_DOWN: return ASCENDING_WEST_UP;
-            }
-            throw new IllegalStateException();
-        }
-    }
-
-    // Get all directions a rail shape connects to
-    private static Set<Direction> getConnectedDirections(org.bukkit.block.data.Rail.Shape shape) {
-        Set<Direction> dirs = new HashSet<>();
-        switch (shape) {
-            case NORTH_SOUTH:
-                dirs.add(Direction.NORTH); dirs.add(Direction.SOUTH); break;
-            case EAST_WEST:
-                dirs.add(Direction.EAST); dirs.add(Direction.WEST); break;
-            case ASCENDING_EAST:
-                // Connects to: flat rail to the west, ascending rail above to the east
-                dirs.add(Direction.WEST); 
-                dirs.add(Direction.ASCENDING_EAST_UP);
-                break;
-            case ASCENDING_WEST:
-                // Connects to: flat rail to the east, ascending rail above to the west
-                dirs.add(Direction.EAST); 
-                dirs.add(Direction.ASCENDING_WEST_UP);
-                break;
-            case ASCENDING_NORTH:
-                // Connects to: flat rail to the south, ascending rail above to the north
-                dirs.add(Direction.SOUTH); 
-                dirs.add(Direction.ASCENDING_NORTH_UP);
-                break;
-            case ASCENDING_SOUTH:
-                // Connects to: flat rail to the north, ascending rail above to the south
-                dirs.add(Direction.NORTH); 
-                dirs.add(Direction.ASCENDING_SOUTH_UP);
-                break;
-            case SOUTH_EAST:
-                dirs.add(Direction.SOUTH); dirs.add(Direction.EAST); break;
-            case SOUTH_WEST:
-                dirs.add(Direction.SOUTH); dirs.add(Direction.WEST); break;
-            case NORTH_EAST:
-                dirs.add(Direction.NORTH); dirs.add(Direction.EAST); break;
-            case NORTH_WEST:
-                dirs.add(Direction.NORTH); dirs.add(Direction.WEST); break;
-        }
-        return dirs;
-    }
+    // Removed shape-based direction helpers; clustering now uses spatial adjacency only.
     
     /**
      * Get TfL tube map colors.

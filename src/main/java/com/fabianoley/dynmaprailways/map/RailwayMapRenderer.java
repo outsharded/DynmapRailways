@@ -128,9 +128,10 @@ public class RailwayMapRenderer {
             Map<String, RailLine> railLines = dataStorage.getRailLines();
             logger.info("[DEBUG] Found " + railLines.size() + " rail lines to render");
             
+            boolean playerPlacedOnly = plugin.getConfig().getBoolean("coreprotect.player-placed-only", true);
             for (RailLine line : railLines.values()) {
                 logger.info("[DEBUG] Processing line: " + line.getId() + " with " + line.getBlockCount() + " blocks, active=" + line.isActive());
-                if (line.isActive() && line.getBlockCount() > 1) {
+                if (line.isActive() && line.getBlockCount() > 1 && (!playerPlacedOnly || line.getCreatedBy() != null)) {
                     renderRailLine(line);
                     logger.info("[DEBUG] Rendered line: " + line.getId());
                 }
@@ -347,7 +348,7 @@ public class RailwayMapRenderer {
         }
 
         // Use correct Dynmap API signature for createCircleMarker
-        // (String id, String label, boolean markup, String world, double x, double y, double z, double radius, double ytop, boolean persistent)
+        // (String id, String label, boolean markup, String world, double x, double y, double z, double radiusx, double radiusz, boolean persistent)
         String world = station.getWorld();
         if (world == null) {
             logger.warning("[renderStation] Station world is null for station: " + station.getId());
@@ -356,15 +357,15 @@ public class RailwayMapRenderer {
         double x = station.getX() + 0.5;
         double z = station.getZ() + 0.5;
         double y = station.getY() > 0 ? station.getY() + 0.5 : 64.0;
-        double radius = 10.0;
-        double ytop = y + 2.0;
+        double radius = 5.0;
         boolean persistent = false;
         CircleMarker marker = stationMarkerSet.createCircleMarker(
             station.getId(), station.getName(), false, world,
-            x, y, z, radius, ytop, persistent
+            x, y, z, radius, radius, persistent
         );
         if (marker != null) {
-            marker.setFillStyle(0.5, 0xFFFFFF);
+            marker.setFillStyle(0.9, 0xFFFFFF);
+            marker.setLineStyle(2, 1.0, 0x000000);
             logger.fine("Rendered station: " + station.getName());
         }
     }

@@ -1,15 +1,11 @@
 package com.fabianoley.dynmaprailways;
 
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.plugin.PluginManager;
-import org.bukkit.Bukkit;
 import com.fabianoley.dynmaprailways.map.RailwayMapRenderer;
 import org.dynmap.DynmapCommonAPI;
 import org.dynmap.DynmapCommonAPIListener;
 import com.fabianoley.dynmaprailways.storage.RailwayDataStorage;
 import com.fabianoley.dynmaprailways.commands.RailwayCommand;
-import java.io.File;
-import java.util.logging.Logger;
 
 /**
  * Main plugin class for DynmapRailways addon.
@@ -18,11 +14,10 @@ import java.util.logging.Logger;
 public class DynmapRailways extends JavaPlugin {
     
     private static DynmapRailways instance;
-    private static final Logger logger = Logger.getLogger("DynmapRailways");
-    
     private DynmapCommonAPI dynmapAPI; // Will be set at runtime
     private RailwayDataStorage dataStorage;
     private RailwayMapRenderer mapRenderer;
+    private com.fabianoley.dynmaprailways.integration.CoreProtectIntegration coreProtect;
     
     @Override
     public void onEnable() {
@@ -56,12 +51,18 @@ public class DynmapRailways extends JavaPlugin {
 
 
 
+                // Initialize CoreProtect (optional)
+                coreProtect = new com.fabianoley.dynmaprailways.integration.CoreProtectIntegration(DynmapRailways.this);
+
                 // Initialize map renderer
                 getLogger().info("[DEBUG] About to initialize map renderer...");
                 mapRenderer = new RailwayMapRenderer(DynmapRailways.this, dynmapAPI, dataStorage);
                 getLogger().info("[DEBUG] RailwayMapRenderer created, calling initialize()...");
                 mapRenderer.initialize();
                 getLogger().info("[DEBUG] Railway map renderer initialization complete.");
+
+                // Provide CoreProtect integration to scanner (optional)
+                com.fabianoley.dynmaprailways.scan.RailScanner.setCoreProtectIntegration(coreProtect);
 
                 // Register commands
                 registerCommands();
@@ -105,8 +106,6 @@ public class DynmapRailways extends JavaPlugin {
      * Register event listeners.
      */
     private void registerListeners() {
-        PluginManager pm = getServer().getPluginManager();
-        // Event listeners will be added as needed
     }
     
     public static DynmapRailways getInstance() {
@@ -123,5 +122,9 @@ public class DynmapRailways extends JavaPlugin {
     
     public RailwayMapRenderer getMapRenderer() {
         return mapRenderer;
+    }
+
+    public com.fabianoley.dynmaprailways.integration.CoreProtectIntegration getCoreProtect() {
+        return coreProtect;
     }
 }
