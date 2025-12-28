@@ -23,10 +23,8 @@ A powerful Minecraft plugin addon for Dynmap that **automatically detects and vi
    - Dynmap plugin
    - (Optional) CoreProtect plugin
 
-2. **Build the plugin**:
-   ```bash
-   mvn clean package
-   ```
+2. **Download the plugin**:
+   - From Github Releases
 
 3. **Install**:
    - Copy `target/dynmap-railways-1.0.0.jar` to your server's `plugins/` folder
