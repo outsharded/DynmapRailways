@@ -99,13 +99,21 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
             // Run scan asynchronously for these chunks only
             Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
                 try {
-                    List<RailLine> lines = RailScanner.scanChunks(world, chunksToScan);
-                    for (RailLine line : lines) {
-                        plugin.getDataStorage().saveRailLine(line);
-                    }
-                    final int lineCount = lines.size();
+                    // Get existing lines
+                    List<RailLine> existingLines = new ArrayList<>(plugin.getDataStorage().getRailLines().values());
+                    
+                    // Scan for new lines
+                    List<RailLine> newLines = RailScanner.scanChunks(world, chunksToScan);
+                    
+                    // Merge with existing lines to prevent duplicates
+                    List<RailLine> mergedLines = RailScanner.mergeWithExistingLines(world, newLines, existingLines);
+                    
+                    // Replace all lines with merged result
+                    plugin.getDataStorage().replaceAllRailLines(mergedLines);
+                    
+                    final int lineCount = mergedLines.size();
                     int humanCount = 0;
-                    for (RailLine line : lines) {
+                    for (RailLine line : mergedLines) {
                         if (line.getCreatedBy() != null && !line.getCreatedBy().isEmpty()) {
                             humanCount++;
                         }
@@ -113,7 +121,7 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
                     final int finalHumanCount = humanCount;
                     Bukkit.getScheduler().runTask(plugin, () -> {
                         plugin.getMapRenderer().updateAllMarkers();
-                        sender.sendMessage("§aRadius scan complete! Found " + lineCount + " rail lines (§b" + finalHumanCount + " player-placed§a).");
+                        sender.sendMessage("§aRadius scan complete! Total " + lineCount + " rail lines (§b" + finalHumanCount + " player-placed§a).");
                         boolean playerOnly = plugin.getConfig().getBoolean("coreprotect.player-placed-only", false);
                         if (playerOnly) {
                             sender.sendMessage("§7Note: Rendering is set to player-placed lines only.");
@@ -134,28 +142,69 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
         // Scan all worlds asynchronously
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
-                int totalLines = 0;
+                // Get all existing lines
+                List<RailLine> existingLines = new ArrayList<>(plugin.getDataStorage().getRailLines().values());
+                List<RailLine> allMergedLines = new ArrayList<>();
+                
                 int humanLines = 0;
                 
                 for (org.bukkit.World world : Bukkit.getWorlds()) {
-                    List<RailLine> lines = RailScanner.scanWorld(world);
-                    totalLines += lines.size();
+                    // Scan this world
+                    List<RailLine> newLines = RailScanner.scanWorld(world);
                     
-                    // Save lines
-                    for (RailLine line : lines) {
-                        plugin.getDataStorage().saveRailLine(line);
+                    // Filter existing lines for this world
+                    List<RailLine> existingForWorld = new ArrayList<>();
+                    for (RailLine line : existingLines) {
+                        boolean isInWorld = false;
+                        for (RailLine.RailBlock block : line.getBlocks()) {
+                            if (block.world.equals(world.getName())) {
+                                isInWorld = true;
+                                break;
+                            }
+                        }
+                        if (isInWorld) {
+                            existingForWorld.add(line);
+                        }
+                    }
+                    
+                    // Merge new lines with existing for this world
+                    List<RailLine> mergedForWorld = RailScanner.mergeWithExistingLines(world, newLines, existingForWorld);
+                    
+                    for (RailLine line : mergedForWorld) {
                         if (line.getCreatedBy() != null && !line.getCreatedBy().isEmpty()) {
                             humanLines++;
                         }
                     }
+                    
+                    allMergedLines.addAll(mergedForWorld);
                 }
                 
+                // Also add lines from worlds that weren't scanned
+                for (RailLine line : existingLines) {
+                    boolean isFromScannedWorld = false;
+                    for (RailLine.RailBlock block : line.getBlocks()) {
+                        for (org.bukkit.World world : Bukkit.getWorlds()) {
+                            if (block.world.equals(world.getName())) {
+                                isFromScannedWorld = true;
+                                break;
+                            }
+                        }
+                        if (isFromScannedWorld) break;
+                    }
+                    if (!isFromScannedWorld) {
+                        allMergedLines.add(line);
+                    }
+                }
+                
+                // Replace all lines with merged result
+                plugin.getDataStorage().replaceAllRailLines(allMergedLines);
+                
                 // Update map on main thread
-                final int finalTotalLines = totalLines;
+                final int finalTotalLines = allMergedLines.size();
                 final int finalHumanLines = humanLines;
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     plugin.getMapRenderer().updateAllMarkers();
-                    sender.sendMessage("§aScanning complete! Found " + finalTotalLines + " rail lines (§b" + finalHumanLines + " player-placed§a).");
+                    sender.sendMessage("§aScanning complete! Total " + finalTotalLines + " rail lines (§b" + finalHumanLines + " player-placed§a).");
                     boolean playerOnly = plugin.getConfig().getBoolean("coreprotect.player-placed-only", false);
                     if (playerOnly) {
                         sender.sendMessage("§7Note: Rendering is set to player-placed lines only.");

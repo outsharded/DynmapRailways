@@ -187,6 +187,18 @@ public class RailwayDataStorage {
     }
     
     /**
+     * Replace all rail lines with a new set.
+     */
+    public void replaceAllRailLines(List<RailLine> newLines) throws Exception {
+        railLines.clear();
+        for (RailLine line : newLines) {
+            railLines.put(line.getId(), line);
+        }
+        saveRailLines();
+        logger.info("Replaced all rail lines. Now storing " + railLines.size() + " lines.");
+    }
+    
+    /**
      * Clear all data.
      */
     public void clearAll() throws Exception {

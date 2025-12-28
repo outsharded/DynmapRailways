@@ -7,7 +7,7 @@ api-version: "1.21"
 depend:
   - dynmap
 softdepend:
-  - coreprotect
+  - CoreProtect
 commands:
   railway:
     description: Railway management commands

@@ -51,8 +51,14 @@ public class DynmapRailways extends JavaPlugin {
 
 
 
-                // Initialize CoreProtect (optional)
-                coreProtect = new com.fabianoley.dynmaprailways.integration.CoreProtectIntegration(DynmapRailways.this);
+                // Initialize CoreProtect (optional, based on config)
+                boolean coreProtectEnabled = getConfig().getBoolean("coreprotect.enabled", true);
+                if (coreProtectEnabled) {
+                    coreProtect = new com.fabianoley.dynmaprailways.integration.CoreProtectIntegration(DynmapRailways.this);
+                    getLogger().info("CoreProtect integration enabled.");
+                } else {
+                    getLogger().info("CoreProtect integration disabled via config.");
+                }
 
                 // Initialize map renderer
                 getLogger().info("[DEBUG] About to initialize map renderer...");

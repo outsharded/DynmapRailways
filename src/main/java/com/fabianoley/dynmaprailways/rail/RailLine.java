@@ -1,7 +1,6 @@
 package com.fabianoley.dynmaprailways.rail;
 
 import java.util.*;
-import org.bukkit.Location;
 
 /**
  * Represents a detected rail line (continuous connected rails).
@@ -48,6 +47,47 @@ public class RailLine {
     
     public int getBlockCount() {
         return blocks.size();
+    }
+    
+    /**
+     * Check if this line overlaps with another line (shares rail blocks).
+     * @param other The other rail line to check against
+     * @return true if they share at least one rail block
+     */
+    public boolean overlapsWith(RailLine other) {
+        for (RailBlock block : blocks) {
+            if (other.blocks.contains(block)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Get the number of overlapping blocks with another line.
+     */
+    public int getOverlapCount(RailLine other) {
+        int count = 0;
+        for (RailBlock block : blocks) {
+            if (other.blocks.contains(block)) {
+                count++;
+            }
+        }
+        return count;
+    }
+    
+    /**
+     * Check if this line contains a specific rail block.
+     */
+    public boolean containsBlock(RailBlock block) {
+        return blocks.contains(block);
+    }
+    
+    /**
+     * Remove a block from this line.
+     */
+    public void removeBlock(RailBlock block) {
+        blocks.remove(block);
     }
     
     /**

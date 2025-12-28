@@ -2,6 +2,8 @@
 
 # CoreProtect integration settings
 coreprotect:
+  # Enable or disable CoreProtect integration
+  enabled: true
   # Only render lines placed by players (exclude natural/admin/worldedit)
   player-placed-only: true
   # Optional age filters (days); 0 disables
@@ -9,3 +11,25 @@ coreprotect:
   max-age-days: 0
   # Optional ignore list of players
   ignore-players: []
+
+# Rail line appearance settings
+lines:
+  # Line width (in pixels)
+  width: 3
+  # Line opacity (0.0 to 1.0)
+  opacity: 1.0
+
+# Station appearance settings
+stations:
+  # Radius of station circles on the map (in blocks)
+  radius: 5.0
+  # Fill color (hex color code)
+  fill-color: "#FFFFFF"
+  # Fill opacity (0.0 to 1.0)
+  fill-opacity: 0.9
+  # Border line width (in pixels)
+  border-width: 2
+  # Border color (hex color code)
+  border-color: "#000000"
+  # Border opacity (0.0 to 1.0)
+  border-opacity: 1.0

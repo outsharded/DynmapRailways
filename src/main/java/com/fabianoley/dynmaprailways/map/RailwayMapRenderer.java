@@ -105,6 +105,15 @@ public class RailwayMapRenderer {
             stationMarkerSet = markerAPI.createMarkerSet(STATIONS_SET_ID, "Railway Stations", null, false);
             logger.info("[DEBUG] Created Railway Stations marker set successfully");
         }
+        
+        // Set layer priorities - higher priority renders on top
+        // Lines at priority 5, stations at priority 10 so stations render over lines
+        if (railwayMarkerSet != null) {
+            railwayMarkerSet.setLayerPriority(5);
+        }
+        if (stationMarkerSet != null) {
+            stationMarkerSet.setLayerPriority(10);
+        }
     }
     
     /**
@@ -118,6 +127,11 @@ public class RailwayMapRenderer {
                 logger.warning("[DEBUG] Marker sets not available - cannot render");
                 return;
             }
+            
+            // Ensure layer priorities are set - higher priority renders on top
+            // This needs to be set every time to persist across zoom/pan operations
+            railwayMarkerSet.setLayerPriority(5);
+            stationMarkerSet.setLayerPriority(10);
             
             // Clear old markers
             clearMarkers(railwayMarkerSet);
@@ -266,7 +280,11 @@ public class RailwayMapRenderer {
         }
         if (marker != null) {
             try {
-                marker.setLineStyle(3, 1.0, parseColorToInt(line.getColor()));
+                // Get line appearance settings from config (with defaults)
+                int lineWidth = plugin.getConfig().getInt("lines.width", 3);
+                double lineOpacity = plugin.getConfig().getDouble("lines.opacity", 1.0);
+                
+                marker.setLineStyle(lineWidth, lineOpacity, parseColorToInt(line.getColor()));
             } catch (Exception e) {
                 logger.warning("[renderRailLine] Exception in setLineStyle: " + e.getMessage());
             }
@@ -357,15 +375,23 @@ public class RailwayMapRenderer {
         double x = station.getX() + 0.5;
         double z = station.getZ() + 0.5;
         double y = station.getY() > 0 ? station.getY() + 0.5 : 64.0;
-        double radius = 5.0;
+        
+        // Get station appearance settings from config (with defaults)
+        double radius = plugin.getConfig().getDouble("stations.radius", 5.0);
+        String fillColorHex = plugin.getConfig().getString("stations.fill-color", "#FFFFFF");
+        double fillOpacity = plugin.getConfig().getDouble("stations.fill-opacity", 0.9);
+        int borderWidth = plugin.getConfig().getInt("stations.border-width", 2);
+        String borderColorHex = plugin.getConfig().getString("stations.border-color", "#000000");
+        double borderOpacity = plugin.getConfig().getDouble("stations.border-opacity", 1.0);
+        
         boolean persistent = false;
         CircleMarker marker = stationMarkerSet.createCircleMarker(
             station.getId(), station.getName(), false, world,
             x, y, z, radius, radius, persistent
         );
         if (marker != null) {
-            marker.setFillStyle(0.9, 0xFFFFFF);
-            marker.setLineStyle(2, 1.0, 0x000000);
+            marker.setFillStyle(fillOpacity, parseColorToInt(fillColorHex));
+            marker.setLineStyle(borderWidth, borderOpacity, parseColorToInt(borderColorHex));
             logger.fine("Rendered station: " + station.getName());
         }
     }

@@ -36,6 +36,111 @@ public class RailScanner {
         
         return lines;
     }
+    
+    /**
+     * Merge newly scanned lines with existing lines to prevent duplicates.
+     * This method:
+     * 1. Validates existing lines (checks if rails still exist)
+     * 2. Checks if new lines overlap with existing lines
+     * 3. Updates existing lines or creates new ones as needed
+     * 
+     * @param world The world being scanned
+     * @param newLines Newly detected lines from scanning
+     * @param existingLines Lines currently stored in the database
+     * @return Merged list of lines (updated existing + genuinely new lines)
+     */
+    public static List<RailLine> mergeWithExistingLines(World world, List<RailLine> newLines, List<RailLine> existingLines) {
+        logger.info("Merging " + newLines.size() + " newly scanned lines with " + existingLines.size() + " existing lines...");
+        
+        // Step 1: Validate existing lines - check if their rails still exist
+        Set<RailBlock> currentRails = findAllRails(world);
+        List<RailLine> validExistingLines = new ArrayList<>();
+        
+        for (RailLine existingLine : existingLines) {
+            // Only keep existing lines from this world
+            boolean isInThisWorld = false;
+            for (RailBlock block : existingLine.getBlocks()) {
+                if (block.world.equals(world.getName())) {
+                    isInThisWorld = true;
+                    break;
+                }
+            }
+            
+            if (!isInThisWorld) {
+                // Line is from a different world, keep it as-is
+                validExistingLines.add(existingLine);
+                continue;
+            }
+            
+            // Check if at least 50% of this line's blocks still exist
+            int existingBlockCount = 0;
+            for (RailBlock block : existingLine.getBlocks()) {
+                if (currentRails.contains(block)) {
+                    existingBlockCount++;
+                }
+            }
+            
+            float existenceRatio = (float) existingBlockCount / existingLine.getBlockCount();
+            if (existenceRatio >= 0.5) {
+                validExistingLines.add(existingLine);
+                logger.info("Existing line " + existingLine.getId() + " validated (" + 
+                           (int)(existenceRatio * 100) + "% blocks still exist)");
+            } else {
+                logger.info("Existing line " + existingLine.getId() + " removed (only " + 
+                           (int)(existenceRatio * 100) + "% blocks still exist)");
+            }
+        }
+        
+        // Step 2: Build a set of all blocks covered by valid existing lines in this world
+        Set<RailBlock> blocksInExistingLines = new HashSet<>();
+        for (RailLine existingLine : validExistingLines) {
+            for (RailBlock block : existingLine.getBlocks()) {
+                if (block.world.equals(world.getName())) {
+                    blocksInExistingLines.add(block);
+                }
+            }
+        }
+        
+        // Step 3: Process new lines - only keep those that don't significantly overlap
+        List<RailLine> mergedLines = new ArrayList<>(validExistingLines);
+        int skippedDuplicates = 0;
+        int addedNewLines = 0;
+        
+        for (RailLine newLine : newLines) {
+            // Calculate how many blocks in this new line are already covered
+            int overlappingBlocks = 0;
+            for (RailBlock block : newLine.getBlocks()) {
+                if (blocksInExistingLines.contains(block)) {
+                    overlappingBlocks++;
+                }
+            }
+            
+            float overlapRatio = (float) overlappingBlocks / newLine.getBlockCount();
+            
+            // If more than 70% of the new line overlaps with existing lines, skip it
+            if (overlapRatio > 0.7) {
+                logger.info("Skipping new line (" + (int)(overlapRatio * 100) + "% overlap with existing lines)");
+                skippedDuplicates++;
+            } else {
+                // This is a genuinely new line or significantly different, add it
+                mergedLines.add(newLine);
+                addedNewLines++;
+                
+                // Add its blocks to the covered set to prevent other duplicates
+                for (RailBlock block : newLine.getBlocks()) {
+                    blocksInExistingLines.add(block);
+                }
+                
+                logger.info("Added new line " + newLine.getId() + " (" + newLine.getBlockCount() + " blocks, " + 
+                           (int)(overlapRatio * 100) + "% overlap)");
+            }
+        }
+        
+        logger.info("Merge complete: " + validExistingLines.size() + " existing lines kept, " + 
+                   addedNewLines + " new lines added, " + skippedDuplicates + " duplicates skipped");
+        
+        return mergedLines;
+    }
 
     /**
      * Scan only the provided chunk set for rail blocks and cluster them into rail lines.
