@@ -16,6 +16,15 @@ permissions:
   railway.use:
     description: Use railway commands
     default: true
+  railway.line.personal:
+    description: Create and manage personal lines (manual lines and lines you placed)
+    default: true
+  railway.station:
+    description: Create and manage stations
+    default: true
   railway.admin:
-    description: Administrative railway commands
+    description: Administrative railway commands (scan, edit any line, manage everything)
     default: op
+    children:
+      railway.line.personal: true
+      railway.station: true

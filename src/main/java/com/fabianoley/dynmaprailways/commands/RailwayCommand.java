@@ -23,6 +23,30 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
         this.plugin = plugin;
     }
     
+    /**
+     * Check if a sender can edit a specific line.
+     * Returns true if:
+     * - Sender has railway.admin permission, OR
+     * - Sender has railway.line.personal permission AND is the line creator
+     */
+    private boolean canEditLine(CommandSender sender, RailLine line) {
+        if (sender.hasPermission("railway.admin")) {
+            return true;
+        }
+        
+        if (sender.hasPermission("railway.line.personal")) {
+            if (sender instanceof Player) {
+                String playerName = ((Player) sender).getName();
+                // Can edit if they created it
+                if (line.getCreatedBy() != null && line.getCreatedBy().equals(playerName)) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+    
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
         if (args.length == 0) {
@@ -37,6 +61,8 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
                 return handleScan(sender, args);
             case "list":
                 return handleList(sender);
+            case "line":
+                return handleLine(sender, args);
             case "station":
                 return handleStation(sender, args);
             case "reload":
@@ -102,14 +128,29 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
                     // Get existing lines
                     List<RailLine> existingLines = new ArrayList<>(plugin.getDataStorage().getRailLines().values());
                     
-                    // Scan for new lines
+                    // Scan for new lines - assign IDs after scanning
                     List<RailLine> newLines = RailScanner.scanChunks(world, chunksToScan);
+                    
+                    // Assign unique IDs to new lines
+                    for (RailLine line : newLines) {
+                        if (line.getId().startsWith("tmp_")) {
+                            String newId = plugin.getDataStorage().generateLineId();
+                            // Create new line with proper ID
+                            RailLine properLine = new RailLine(newId, line.getColor());
+                            properLine.setName(line.getName());
+                            properLine.setCreatedBy(line.getCreatedBy());
+                            properLine.addBlocks(line.getBlocks());
+                            // Replace in list
+                            newLines.set(newLines.indexOf(line), properLine);
+                        }
+                    }
                     
                     // Merge with existing lines to prevent duplicates
                     List<RailLine> mergedLines = RailScanner.mergeWithExistingLines(world, newLines, existingLines);
                     
-                    // Replace all lines with merged result
-                    plugin.getDataStorage().replaceAllRailLines(mergedLines);
+                    // Filter and replace all lines with merged result
+                    int minLineLength = plugin.getConfig().getInt("general.min-line-length", 15);
+                    plugin.getDataStorage().replaceAllRailLinesFiltered(mergedLines, minLineLength);
                     
                     final int lineCount = mergedLines.size();
                     int humanCount = 0;
@@ -151,6 +192,18 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
                 for (org.bukkit.World world : Bukkit.getWorlds()) {
                     // Scan this world
                     List<RailLine> newLines = RailScanner.scanWorld(world);
+                    
+                    // Assign unique IDs to new lines
+                    for (RailLine line : newLines) {
+                        if (line.getId().startsWith("tmp_")) {
+                            String newId = plugin.getDataStorage().generateLineId();
+                            RailLine properLine = new RailLine(newId, line.getColor());
+                            properLine.setName(line.getName());
+                            properLine.setCreatedBy(line.getCreatedBy());
+                            properLine.addBlocks(line.getBlocks());
+                            newLines.set(newLines.indexOf(line), properLine);
+                        }
+                    }
                     
                     // Filter existing lines for this world
                     List<RailLine> existingForWorld = new ArrayList<>();
@@ -196,8 +249,9 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
                     }
                 }
                 
-                // Replace all lines with merged result
-                plugin.getDataStorage().replaceAllRailLines(allMergedLines);
+                // Filter and replace all lines with merged result
+                int minLineLength = plugin.getConfig().getInt("general.min-line-length", 15);
+                plugin.getDataStorage().replaceAllRailLinesFiltered(allMergedLines, minLineLength);
                 
                 // Update map on main thread
                 final int finalTotalLines = allMergedLines.size();
@@ -231,13 +285,206 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
             
             for (RailLine line : lines.values()) {
                 if (line.isActive()) {
-                    sender.sendMessage("§e" + line.getName() + " §7(" + line.getBlockCount() + " blocks)");
+                    sender.sendMessage("§e" + line.getId() + ": §f" + line.getName() + " §7(" + line.getBlockCount() + " blocks, " + line.getColor() + ")");
                 }
             }
         } catch (Exception e) {
             sender.sendMessage("§cError listing rail lines: " + e.getMessage());
         }
         return true;
+    }
+    
+    private boolean handleLine(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage("§cUsage: /railway line <list|color|rename|create|addpoint|remove>");
+            return true;
+        }
+        
+        String action = args[1].toLowerCase();
+        
+        switch (action) {
+            case "list":
+                // Same as /railway list
+                return handleList(sender);
+                
+            case "color":
+                if (args.length < 4) {
+                    sender.sendMessage("§cUsage: /railway line color <line-id> <hex-color>");
+                    sender.sendMessage("§7Example: /railway line color a3f #FF0000");
+                    return true;
+                }
+                
+                String lineId = args[2];
+                String color = args[3];
+                
+                // Validate hex color
+                if (!color.matches("^#[0-9A-Fa-f]{6}$")) {
+                    sender.sendMessage("§cInvalid color format. Use hex format like #FF0000");
+                    return true;
+                }
+                
+                try {
+                    RailLine line = plugin.getDataStorage().getRailLine(lineId);
+                    if (line == null) {
+                        sender.sendMessage("§cLine not found: " + lineId);
+                        sender.sendMessage("§7Use /railway list to see available lines.");
+                        return true;
+                    }
+                    
+                    if (!canEditLine(sender, line)) {
+                        sender.sendMessage("§cYou don't have permission to edit this line.");
+                        sender.sendMessage("§7You can only edit lines you created.");
+                        return true;
+                    }
+                    
+                    line.setColor(color.toUpperCase());
+                    plugin.getDataStorage().saveRailLine(line);
+                    plugin.getMapRenderer().updateAllMarkers();
+                    sender.sendMessage("§aSet color of " + line.getName() + " to " + color.toUpperCase());
+                } catch (Exception e) {
+                    sender.sendMessage("§cError setting color: " + e.getMessage());
+                }
+                return true;
+                
+            case "rename":
+                if (args.length < 4) {
+                    sender.sendMessage("§cUsage: /railway line rename <line-id> <new-name>");
+                    sender.sendMessage("§7Example: /railway line rename a3f Northern Line");
+                    return true;
+                }
+                
+                String renameLineId = args[2];
+                String newName = String.join(" ", Arrays.copyOfRange(args, 3, args.length));
+                
+                try {
+                    RailLine lineToRename = plugin.getDataStorage().getRailLine(renameLineId);
+                    if (lineToRename == null) {
+                        sender.sendMessage("§cLine not found: " + renameLineId);
+                        sender.sendMessage("§7Use /railway list to see available lines.");
+                        return true;
+                    }
+                    
+                    if (!canEditLine(sender, lineToRename)) {
+                        sender.sendMessage("§cYou don't have permission to edit this line.");
+                        sender.sendMessage("§7You can only edit lines you created.");
+                        return true;
+                    }
+                    
+                    String oldName = lineToRename.getName();
+                    lineToRename.setName(newName);
+                    plugin.getDataStorage().saveRailLine(lineToRename);
+                    plugin.getMapRenderer().updateAllMarkers();
+                    sender.sendMessage("§aRenamed line from '" + oldName + "' to '" + newName + "'");
+                } catch (Exception e) {
+                    sender.sendMessage("§cError renaming line: " + e.getMessage());
+                }
+                return true;
+                
+            case "create":
+                if (args.length < 3) {
+                    sender.sendMessage("§cUsage: /railway line create <name>");
+                    return true;
+                }
+                
+                if (!sender.hasPermission("railway.line.personal") && !sender.hasPermission("railway.admin")) {
+                    sender.sendMessage("§cYou don't have permission to create lines.");
+                    return true;
+                }
+                
+                String lineName = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
+                
+                try {
+                    String newLineId = plugin.getDataStorage().generateLineId();
+                    RailLine newLine = new RailLine(newLineId, "#888888"); // Default gray
+                    newLine.setName(lineName);
+                    if (sender instanceof Player) {
+                        newLine.setCreatedBy(((Player) sender).getName());
+                    }
+                    plugin.getDataStorage().saveRailLine(newLine);
+                    sender.sendMessage("§aCreated line: " + lineName + " (ID: " + newLineId + ")");
+                    sender.sendMessage("§7Add waypoints with: /railway line addpoint " + newLineId);
+                } catch (Exception e) {
+                    sender.sendMessage("§cError creating line: " + e.getMessage());
+                }
+                return true;
+                
+            case "addpoint":
+                if (args.length < 3) {
+                    sender.sendMessage("§cUsage: /railway line addpoint <line-id>");
+                    return true;
+                }
+                
+                if (!(sender instanceof Player)) {
+                    sender.sendMessage("§cThis command requires player context.");
+                    return true;
+                }
+                
+                Player player = (Player) sender;
+                String targetLineId = args[2];
+                
+                try {
+                    RailLine targetLine = plugin.getDataStorage().getRailLine(targetLineId);
+                    if (targetLine == null) {
+                        sender.sendMessage("§cLine not found: " + targetLineId);
+                        return true;
+                    }
+                    
+                    if (!canEditLine(sender, targetLine)) {
+                        sender.sendMessage("§cYou don't have permission to edit this line.");
+                        sender.sendMessage("§7You can only edit lines you created.");
+                        return true;
+                    }
+                    
+                    int x = player.getLocation().getBlockX();
+                    int y = player.getLocation().getBlockY();
+                    int z = player.getLocation().getBlockZ();
+                    String world = player.getWorld().getName();
+                    
+                    RailLine.RailBlock block = new RailLine.RailBlock(x, y, z, world);
+                    targetLine.addBlock(block);
+                    plugin.getDataStorage().saveRailLine(targetLine);
+                    plugin.getMapRenderer().updateAllMarkers();
+                    
+                    sender.sendMessage("§aAdded waypoint to " + targetLine.getName() + " at (" + x + ", " + y + ", " + z + ")");
+                    sender.sendMessage("§7Total waypoints: " + targetLine.getBlockCount());
+                } catch (Exception e) {
+                    sender.sendMessage("§cError adding waypoint: " + e.getMessage());
+                }
+                return true;
+                
+            case "remove":
+                if (args.length < 3) {
+                    sender.sendMessage("§cUsage: /railway line remove <line-id>");
+                    return true;
+                }
+                
+                String removeLineId = args[2];
+                
+                try {
+                    RailLine lineToRemove = plugin.getDataStorage().getRailLine(removeLineId);
+                    if (lineToRemove == null) {
+                        sender.sendMessage("§cLine not found: " + removeLineId);
+                        return true;
+                    }
+                    
+                    if (!canEditLine(sender, lineToRemove)) {
+                        sender.sendMessage("§cYou don't have permission to remove this line.");
+                        sender.sendMessage("§7You can only remove lines you created.");
+                        return true;
+                    }
+                    
+                    plugin.getDataStorage().removeRailLine(removeLineId);
+                    plugin.getMapRenderer().updateAllMarkers();
+                    sender.sendMessage("§aRemoved line: " + lineToRemove.getName());
+                } catch (Exception e) {
+                    sender.sendMessage("§cError removing line: " + e.getMessage());
+                }
+                return true;
+                
+            default:
+                sender.sendMessage("§cUnknown line action. Use: list, color, create, addpoint, or remove");
+                return true;
+        }
     }
     
     private boolean handleStation(CommandSender sender, String[] args) {
@@ -258,6 +505,11 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
             case "create":
                 if (args.length < 3) {
                     sender.sendMessage("§cUsage: /railway station create <name>");
+                    return true;
+                }
+                
+                if (!sender.hasPermission("railway.station") && !sender.hasPermission("railway.admin")) {
+                    sender.sendMessage("§cYou don't have permission to create stations.");
                     return true;
                 }
                 
@@ -321,7 +573,7 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
         }
         
         try {
-            plugin.getMapRenderer().updateAllMarkers();
+            plugin.getMapRenderer().forceReinitialize();
             sender.sendMessage("§aMap reloaded.");
         } catch (Exception e) {
             sender.sendMessage("§cError reloading: " + e.getMessage());
@@ -402,22 +654,47 @@ public class RailwayCommand implements CommandExecutor, TabCompleter {
     
     private void sendHelp(CommandSender sender) {
         sender.sendMessage("§6Railway Commands:");
-        sender.sendMessage("§e/railway scan §7- Scan worlds for rail blocks (admin)");
-        sender.sendMessage("§e/railway list §7- List detected rail lines");
-        sender.sendMessage("§e/railway station create <name> §7- Create a station at your location");
+        sender.sendMessage("§e/railway scan [radius] §7- Scan for rail blocks (admin)");
+        sender.sendMessage("§e/railway list §7- List all rail lines");
+        sender.sendMessage("§e/railway line list §7- List all rail lines with details");
+        sender.sendMessage("§e/railway line color <id> <#color> §7- Set line color (admin)");
+        sender.sendMessage("§e/railway line rename <id> <name> §7- Rename a line (admin)");
+        sender.sendMessage("§e/railway line create <name> §7- Create manual line (admin)");
+        sender.sendMessage("§e/railway line addpoint <id> §7- Add waypoint at location (admin)");
+        sender.sendMessage("§e/railway line remove <id> §7- Remove a line (admin)");
+        sender.sendMessage("§e/railway station create <name> §7- Create a station");
         sender.sendMessage("§e/railway station list §7- List all stations");
         sender.sendMessage("§e/railway station remove <name> §7- Remove a station");
-        sender.sendMessage("§e/railway reload §7- Reload map visualization (admin)");
+        sender.sendMessage("§e/railway reload §7- Reload visualization (admin)");
     }
     
     @Override
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
         if (args.length == 1) {
-            return Arrays.asList("scan", "list", "station", "reload");
+            return Arrays.asList("scan", "list", "line", "station", "reload");
+        }
+        
+        if (args.length == 2 && args[0].equalsIgnoreCase("line")) {
+            return Arrays.asList("list", "color", "rename", "create", "addpoint", "remove");
         }
         
         if (args.length == 2 && args[0].equalsIgnoreCase("station")) {
             return Arrays.asList("create", "list", "remove");
+        }
+        
+        if (args.length == 3 && args[0].equalsIgnoreCase("line") && 
+            (args[1].equalsIgnoreCase("color") || args[1].equalsIgnoreCase("rename") || 
+             args[1].equalsIgnoreCase("addpoint") || args[1].equalsIgnoreCase("remove"))) {
+            // Tab complete line IDs
+            List<String> lineIds = new ArrayList<>();
+            try {
+                for (RailLine line : plugin.getDataStorage().getRailLines().values()) {
+                    lineIds.add(line.getId());
+                }
+            } catch (Exception e) {
+                // Ignore
+            }
+            return lineIds;
         }
         
         return Collections.emptyList();

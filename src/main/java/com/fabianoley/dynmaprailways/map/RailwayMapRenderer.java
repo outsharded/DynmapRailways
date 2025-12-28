@@ -38,26 +38,39 @@ public class RailwayMapRenderer {
     }
     
     /**
+     * Check if debug mode is enabled.
+     */
+    private boolean isDebugEnabled() {
+        return plugin.getConfig().getBoolean("general.debug", false);
+    }
+    
+    /**
      * Initialize the map renderer.
      */
     public void initialize() {
-        logger.info("[DEBUG] Starting RailwayMapRenderer initialization...");
+        if (isDebugEnabled()) {
+            logger.info("[DEBUG] Starting RailwayMapRenderer initialization...");
+        }
         // Touch plugin to avoid unused field warning and for debugging context
         if (plugin != null) {
-            logger.fine("[DEBUG] Renderer initialized for plugin: " + plugin.getClass().getName());
+            if (isDebugEnabled()) {
+                logger.fine("[DEBUG] Renderer initialized for plugin: " + plugin.getClass().getName());
+            }
         }
-
-        // No CoreProtect filtering
 
         if (dynmapAPI == null) {
             logger.severe("[DEBUG] Dynmap API is null!");
             return;
         }
-        logger.info("[DEBUG] Dynmap API found: " + dynmapAPI.getClass().getName());
+        if (isDebugEnabled()) {
+            logger.info("[DEBUG] Dynmap API found: " + dynmapAPI.getClass().getName());
+        }
 
         // Get Marker API
         markerAPI = dynmapAPI.getMarkerAPI();
-        logger.info("[DEBUG] Marker API retrieved: " + (markerAPI != null ? markerAPI.getClass().getName() : "null"));
+        if (isDebugEnabled()) {
+            logger.info("[DEBUG] Marker API retrieved: " + (markerAPI != null ? markerAPI.getClass().getName() : "null"));
+        }
 
         if (markerAPI == null) {
             logger.severe("[DEBUG] Dynmap Marker API not available!");
@@ -65,19 +78,27 @@ public class RailwayMapRenderer {
         }
 
         // Get or create marker sets
-        logger.info("[DEBUG] Creating marker sets...");
+        if (isDebugEnabled()) {
+            logger.info("[DEBUG] Creating marker sets...");
+        }
         createMarkerSets();
 
-        logger.info("[DEBUG] Railway marker set: " + (railwayMarkerSet != null ? railwayMarkerSet.getClass().getName() : "null"));
-        logger.info("[DEBUG] Station marker set: " + (stationMarkerSet != null ? stationMarkerSet.getClass().getName() : "null"));
+        if (isDebugEnabled()) {
+            logger.info("[DEBUG] Railway marker set: " + (railwayMarkerSet != null ? railwayMarkerSet.getClass().getName() : "null"));
+            logger.info("[DEBUG] Station marker set: " + (stationMarkerSet != null ? stationMarkerSet.getClass().getName() : "null"));
+        }
 
         if (railwayMarkerSet == null || stationMarkerSet == null) {
-            logger.warning("[DEBUG] Failed to create marker sets");
+            if (isDebugEnabled()) {
+                logger.warning("[DEBUG] Failed to create marker sets");
+            }
             return;
         }
 
         // Initial render
-        logger.info("[DEBUG] Updating all markers...");
+        if (isDebugEnabled()) {
+            logger.info("[DEBUG] Updating all markers...");
+        }
         updateAllMarkers();
 
         logger.info("Railway map renderer initialized successfully.");
@@ -87,23 +108,35 @@ public class RailwayMapRenderer {
      * Create or get marker sets.
      */
     private void createMarkerSets() {
-        logger.info("[DEBUG] createMarkerSets() called");
+        if (isDebugEnabled()) {
+            logger.info("[DEBUG] createMarkerSets() called");
+        }
         // Get marker sets
         railwayMarkerSet = markerAPI.getMarkerSet(MARKER_SET_ID);
         stationMarkerSet = markerAPI.getMarkerSet(STATIONS_SET_ID);
-        logger.info("[DEBUG] Retrieved existing marker sets: railway=" + (railwayMarkerSet != null) + ", station=" + (stationMarkerSet != null));
+        if (isDebugEnabled()) {
+            logger.info("[DEBUG] Retrieved existing marker sets: railway=" + (railwayMarkerSet != null) + ", station=" + (stationMarkerSet != null));
+        }
 
         // Create if missing
         if (railwayMarkerSet == null) {
-            logger.info("[DEBUG] Railway marker set is null, attempting to create...");
+            if (isDebugEnabled()) {
+                logger.info("[DEBUG] Railway marker set is null, attempting to create...");
+            }
             railwayMarkerSet = markerAPI.createMarkerSet(MARKER_SET_ID, "Railway Lines", null, false);
-            logger.info("[DEBUG] Created Railway Lines marker set successfully");
+            if (isDebugEnabled()) {
+                logger.info("[DEBUG] Created Railway Lines marker set successfully");
+            }
         }
 
         if (stationMarkerSet == null) {
-            logger.info("[DEBUG] Station marker set is null, attempting to create...");
+            if (isDebugEnabled()) {
+                logger.info("[DEBUG] Station marker set is null, attempting to create...");
+            }
             stationMarkerSet = markerAPI.createMarkerSet(STATIONS_SET_ID, "Railway Stations", null, false);
-            logger.info("[DEBUG] Created Railway Stations marker set successfully");
+            if (isDebugEnabled()) {
+                logger.info("[DEBUG] Created Railway Stations marker set successfully");
+            }
         }
         
         // Set layer priorities - higher priority renders on top
@@ -121,10 +154,14 @@ public class RailwayMapRenderer {
      */
     public void updateAllMarkers() {
         try {
-            logger.info("[DEBUG] updateAllMarkers() called");
+            if (isDebugEnabled()) {
+                logger.info("[DEBUG] updateAllMarkers() called");
+            }
             
             if (railwayMarkerSet == null || stationMarkerSet == null) {
-                logger.warning("[DEBUG] Marker sets not available - cannot render");
+                if (isDebugEnabled()) {
+                    logger.warning("[DEBUG] Marker sets not available - cannot render");
+                }
                 return;
             }
             
@@ -136,34 +173,50 @@ public class RailwayMapRenderer {
             // Clear old markers
             clearMarkers(railwayMarkerSet);
             clearMarkers(stationMarkerSet);
-            logger.info("[DEBUG] Cleared old markers");
+            if (isDebugEnabled()) {
+                logger.info("[DEBUG] Cleared old markers");
+            }
             
             // Render rail lines
             Map<String, RailLine> railLines = dataStorage.getRailLines();
-            logger.info("[DEBUG] Found " + railLines.size() + " rail lines to render");
+            if (isDebugEnabled()) {
+                logger.info("[DEBUG] Found " + railLines.size() + " rail lines to render");
+            }
             
             boolean playerPlacedOnly = plugin.getConfig().getBoolean("coreprotect.player-placed-only", true);
             for (RailLine line : railLines.values()) {
-                logger.info("[DEBUG] Processing line: " + line.getId() + " with " + line.getBlockCount() + " blocks, active=" + line.isActive());
+                if (isDebugEnabled()) {
+                    logger.info("[DEBUG] Processing line: " + line.getId() + " with " + line.getBlockCount() + " blocks, active=" + line.isActive());
+                }
                 if (line.isActive() && line.getBlockCount() > 1 && (!playerPlacedOnly || line.getCreatedBy() != null)) {
                     renderRailLine(line);
-                    logger.info("[DEBUG] Rendered line: " + line.getId());
+                    if (isDebugEnabled()) {
+                        logger.info("[DEBUG] Rendered line: " + line.getId());
+                    }
                 }
             }
             
             // Render stations
             Map<String, Station> stations = dataStorage.getStations();
-            logger.info("[DEBUG] Found " + stations.size() + " stations to render");
+            if (isDebugEnabled()) {
+                logger.info("[DEBUG] Found " + stations.size() + " stations to render");
+            }
             
             for (Station station : stations.values()) {
-                logger.info("[DEBUG] Processing station: " + station.getId() + ", active=" + station.isActive());
+                if (isDebugEnabled()) {
+                    logger.info("[DEBUG] Processing station: " + station.getId() + ", active=" + station.isActive());
+                }
                 if (station.isActive()) {
                     renderStation(station);
-                    logger.info("[DEBUG] Rendered station: " + station.getId());
+                    if (isDebugEnabled()) {
+                        logger.info("[DEBUG] Rendered station: " + station.getId());
+                    }
                 }
             }
             
-            logger.info("[DEBUG] updateAllMarkers() completed successfully");
+            if (isDebugEnabled()) {
+                logger.info("[DEBUG] updateAllMarkers() completed successfully");
+            }
         } catch (Exception e) {
             logger.warning("Error updating markers: " + e.getMessage());
             e.printStackTrace();
@@ -379,7 +432,7 @@ public class RailwayMapRenderer {
         // Get station appearance settings from config (with defaults)
         double radius = plugin.getConfig().getDouble("stations.radius", 5.0);
         String fillColorHex = plugin.getConfig().getString("stations.fill-color", "#FFFFFF");
-        double fillOpacity = plugin.getConfig().getDouble("stations.fill-opacity", 0.9);
+        double fillOpacity = plugin.getConfig().getDouble("stations.fill-opacity", 0.3);
         int borderWidth = plugin.getConfig().getInt("stations.border-width", 2);
         String borderColorHex = plugin.getConfig().getString("stations.border-color", "#000000");
         double borderOpacity = plugin.getConfig().getDouble("stations.border-opacity", 1.0);

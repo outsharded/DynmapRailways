@@ -4,6 +4,7 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.Material;
 
+import com.fabianoley.dynmaprailways.DynmapRailways;
 import com.fabianoley.dynmaprailways.integration.CoreProtectIntegration;
 import com.fabianoley.dynmaprailways.rail.RailLine;
 import com.fabianoley.dynmaprailways.rail.RailLine.RailBlock;
@@ -17,9 +18,15 @@ public class RailScanner {
     
     private static final Logger logger = Logger.getLogger("DynmapRailways");
     private static CoreProtectIntegration coreProtect;
+    private static DynmapRailways plugin;
 
-    public static void setCoreProtectIntegration(CoreProtectIntegration integration) {
+    public static void setCoreProtectIntegration(CoreProtectIntegration integration, DynmapRailways pluginInstance) {
         coreProtect = integration;
+        plugin = pluginInstance;
+    }
+
+    private static boolean isDebugEnabled() {
+        return plugin != null && plugin.getConfig().getBoolean("general.debug", false);
     }
     
     /**
@@ -131,8 +138,10 @@ public class RailScanner {
                     blocksInExistingLines.add(block);
                 }
                 
-                logger.info("Added new line " + newLine.getId() + " (" + newLine.getBlockCount() + " blocks, " + 
-                           (int)(overlapRatio * 100) + "% overlap)");
+                if (isDebugEnabled()) {
+                    logger.info("Added new line " + newLine.getId() + " (" + newLine.getBlockCount() + " blocks, " + (int)(overlapRatio * 100) + "% overlap)");
+                }
+
             }
         }
         
@@ -229,6 +238,13 @@ public class RailScanner {
      * Lines are traced from endpoints (1 neighbor) following the path until reaching another endpoint.
      */
     private static List<RailLine> clusterRails(World world, Set<RailBlock> allRails) {
+        return clusterRailsWithIdGenerator(world, allRails, null);
+    }
+    
+    /**
+     * Cluster rails with optional ID generator for creating unique IDs.
+     */
+    private static List<RailLine> clusterRailsWithIdGenerator(World world, Set<RailBlock> allRails, java.util.function.Supplier<String> idGenerator) {
         List<RailLine> lines = new ArrayList<>();
         Set<RailBlock> visited = new HashSet<>();
         String[] colors = getTflColors();
@@ -353,8 +369,9 @@ public class RailScanner {
             
             // Create line if it has more than one block
             if (line.size() > 1) {
+                String lineId = idGenerator != null ? idGenerator.get() : "tmp_" + lines.size();
                 RailLine railLine = new RailLine(
-                        "line_" + lines.size(),
+                        lineId,
                         colors[colorIndex % colors.length]
                 );
                 railLine.addBlocks(line);
@@ -378,8 +395,9 @@ public class RailScanner {
             if (!visited.contains(rail)) {
                 Set<RailBlock> cluster = dfsCluster(rail, neighborMap, new HashSet<>());
                 if (!cluster.isEmpty()) {
+                    String lineId = idGenerator != null ? idGenerator.get() : "tmp_" + lines.size();
                     RailLine railLine = new RailLine(
-                            "line_" + lines.size(),
+                            lineId,
                             colors[colorIndex % colors.length]
                     );
                     railLine.addBlocks(cluster);

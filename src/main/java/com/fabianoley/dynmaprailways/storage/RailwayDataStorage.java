@@ -51,6 +51,35 @@ public class RailwayDataStorage {
     }
     
     /**
+     * Generate a short unique hex ID for a rail line.
+     * Starts with 3 characters and grows if needed to avoid collisions.
+     */
+    public String generateLineId() {
+        Random random = new Random();
+        int length = 3;
+        int maxAttempts = 100;
+        
+        while (length <= 8) { // Max 8 characters
+            for (int attempt = 0; attempt < maxAttempts; attempt++) {
+                StringBuilder id = new StringBuilder();
+                for (int i = 0; i < length; i++) {
+                    id.append(Integer.toHexString(random.nextInt(16)));
+                }
+                String candidate = id.toString();
+                
+                // Check if this ID is already in use
+                if (!railLines.containsKey(candidate)) {
+                    return candidate;
+                }
+            }
+            length++; // Grow length if we couldn't find unique ID
+        }
+        
+        // Fallback to timestamp-based if somehow we still have collisions
+        return Long.toHexString(System.currentTimeMillis());
+    }
+    
+    /**
      * Load all data from storage.
      */
     private void loadAllData() throws Exception {
@@ -196,6 +225,23 @@ public class RailwayDataStorage {
         }
         saveRailLines();
         logger.info("Replaced all rail lines. Now storing " + railLines.size() + " lines.");
+    }
+    
+    /**
+     * Replace all rail lines with filtering by minimum length from config.
+     */
+    public void replaceAllRailLinesFiltered(List<RailLine> newLines, int minLength) throws Exception {
+        railLines.clear();
+        int filtered = 0;
+        for (RailLine line : newLines) {
+            if (line.getBlockCount() >= minLength) {
+                railLines.put(line.getId(), line);
+            } else {
+                filtered++;
+            }
+        }
+        saveRailLines();
+        logger.info("Replaced all rail lines. Now storing " + railLines.size() + " lines (filtered " + filtered + " lines below minimum length).");
     }
     
     /**

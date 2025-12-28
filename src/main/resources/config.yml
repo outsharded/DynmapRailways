@@ -1,5 +1,13 @@
 # DynmapRailways Configuration
 
+# General settings
+general:
+  # Enable debug logging to console
+  debug: false
+  # Minimum number of blocks required for a line to be saved
+  # Lines with fewer blocks will be ignored
+  min-line-length: 15
+
 # CoreProtect integration settings
 coreprotect:
   # Enable or disable CoreProtect integration
@@ -26,7 +34,7 @@ stations:
   # Fill color (hex color code)
   fill-color: "#FFFFFF"
   # Fill opacity (0.0 to 1.0)
-  fill-opacity: 0.9
+  fill-opacity: 0.5
   # Border line width (in pixels)
   border-width: 2
   # Border color (hex color code)

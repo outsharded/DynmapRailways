@@ -61,14 +61,21 @@ public class DynmapRailways extends JavaPlugin {
                 }
 
                 // Initialize map renderer
-                getLogger().info("[DEBUG] About to initialize map renderer...");
+                boolean debugEnabled = getConfig().getBoolean("general.debug", false);
+                if (debugEnabled) {
+                    getLogger().info("[DEBUG] About to initialize map renderer...");
+                }
                 mapRenderer = new RailwayMapRenderer(DynmapRailways.this, dynmapAPI, dataStorage);
-                getLogger().info("[DEBUG] RailwayMapRenderer created, calling initialize()...");
+                if (debugEnabled) {
+                    getLogger().info("[DEBUG] RailwayMapRenderer created, calling initialize()...");
+                }
                 mapRenderer.initialize();
-                getLogger().info("[DEBUG] Railway map renderer initialization complete.");
+                if (debugEnabled) {
+                    getLogger().info("[DEBUG] Railway map renderer initialization complete.");
+                }
 
                 // Provide CoreProtect integration to scanner (optional)
-                com.fabianoley.dynmaprailways.scan.RailScanner.setCoreProtectIntegration(coreProtect);
+                com.fabianoley.dynmaprailways.scan.RailScanner.setCoreProtectIntegration(coreProtect, DynmapRailways.this);
 
                 // Register commands
                 registerCommands();
